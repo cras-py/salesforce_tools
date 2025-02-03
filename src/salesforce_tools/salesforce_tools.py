@@ -4,7 +4,7 @@ from simple_salesforce import Salesforce
 from datetime import datetime
 import numpy as np
 
-class SalesforceOpportunitiesAnalyzer:
+class SalesforceTools:
     def __init__(self, username, password, security_token, domain='login'):
         self.sf = Salesforce(username=username, password=password, security_token=security_token, domain=domain)
         self.opportunities = None

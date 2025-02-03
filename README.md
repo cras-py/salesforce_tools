@@ -6,6 +6,7 @@ A package for working with data from Salesforce
 
 ```bash
 $ pip install salesforce_tools
+$ pip install git+https://github.com/cras-py/salesforce_tools
 ```
 
 ## Usage
