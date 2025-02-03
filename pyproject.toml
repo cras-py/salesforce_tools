@@ -8,6 +8,11 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
+simple-salesforce = "^1.12.6"
+matplotlib = "^3.10.0"
+pandas = "^2.2.3"
+datetime = "^5.5"
+numpy = "^2.2.2"
 
 [tool.semantic_release]
 version_toml = [
