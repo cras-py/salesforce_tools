@@ -54,15 +54,11 @@ class SalesforceTools:
         except:
             print("The Query returned 0 rows")
     
-    def query_opportunities(self,dateList,tz):
-        current_year = datetime.now().year
-        last_two_years_start = f"{current_year - 2}-01-01"
-        next_year_end = f"{current_year + 1}-12-31"
-
+    def query_opportunities(self,dateList=None,tz=None,startDate=f"{datetime.now().year}-01-01",endDate=f"{datetime.now().year}-12-31"):
         soql_query = f"""
         SELECT Id, Name, StageName, Amount, CloseDate, CreatedDate, IsWon, IsClosed, OwnerId, Type, Probability, AccountId
         FROM Opportunity
-        WHERE CloseDate >= {last_two_years_start} AND CloseDate <= {next_year_end}
+        WHERE CloseDate >= {startDate} AND CloseDate <= {endDate}
         """
         self.opportunities = self.sf_api_query(soql_query,dateList,tz)
         return self.opportunities
@@ -193,6 +189,15 @@ class SalesforceTools:
     
     def _calculate_upsell(self, won_opps):
         return won_opps[won_opps['Type'] == 'Upsell']['Amount'].sum()
+    
+    def _calculate_new(self, won_opps):
+        return won_opps[won_opps['Type'] == 'New']['Amount'].sum()
+    
+    def _calculate_pipeline(self, df, pipestages):
+        return df[df['StageName'].isin(pipestages)]['Amount'].sum()
+    
+    def _get_pipeline(self, df, pipestages):
+        return df[df['StageName'].isin(pipestages)]
     
     def _calculate_cross_sell(self, won_opps):
         return won_opps[won_opps['Type'] == 'Cross-Sell']['Amount'].sum()
