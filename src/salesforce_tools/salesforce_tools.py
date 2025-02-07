@@ -54,7 +54,11 @@ class SalesforceTools:
         except:
             print("The Query returned 0 rows")
     
-    def query_opportunities(self,dateList=None,tz=None,startDate=f"{datetime.now().year}-01-01",endDate=f"{datetime.now().year}-12-31"):
+    def query_opportunities(self, dateList=None, tz=None, startDate=None, endDate=None):
+        if startDate is None:
+            startDate = f"{datetime.now().year}-01-01"
+        if endDate is None:
+            endDate = f"{datetime.now().year}-12-31"
         soql_query = f"""
         SELECT Id, Name, StageName, Amount, CloseDate, CreatedDate, IsWon, IsClosed, OwnerId, Type, Probability, AccountId
         FROM Opportunity
