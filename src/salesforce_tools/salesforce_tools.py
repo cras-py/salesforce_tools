@@ -309,7 +309,7 @@ class SalesforceTools:
         segments = {
             "total": df,
             "won": df[df['IsWon'] == True],
-            "lost": df[df['IsClosed'] == True][df['IsWon'] == False],
+            "lost": df[(df['IsClosed'] == True) & (df['IsWon'] == False)],
             "closed": df[df['IsClosed'] == True],
             "open": df[df['IsClosed'] == False],
             "expansion": df[df['Type'] == 'Expansion'],
