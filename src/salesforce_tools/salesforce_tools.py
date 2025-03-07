@@ -15,7 +15,7 @@ DEFAULT_START_DATE = f"{datetime.now().year}-01-01"
 DEFAULT_END_DATE = f"{datetime.now().year}-12-31"
 DEFAULT_WIN_PROBABILITY = 0.5
 DEFAULT_MARKETING_COST = 50000  # Should be configured based on actual costs
-
+DEFAULT_AMOUNT_FIELD = 'NewARRFixedRate__c'
 
 class SalesforceTools:
     """
@@ -165,7 +165,8 @@ class SalesforceTools:
     def query_opportunities(self, date_columns: Optional[List[str]] = None, 
                            timezone: Optional[str] = None,
                            start_date: Optional[str] = None, 
-                           end_date: Optional[str] = None) -> pd.DataFrame:
+                           end_date: Optional[str] = None,
+                           amount_field: Optional[str] = None) -> pd.DataFrame:
         """
         Query opportunity data from Salesforce for a specified date range.
         
@@ -191,6 +192,8 @@ class SalesforceTools:
             start_date = DEFAULT_START_DATE
         if end_date is None:
             end_date = DEFAULT_END_DATE
+        if amount_field is None:
+            amount_field = DEFAULT_AMOUNT_FIELD
             
         # Default date columns if not specified
         if date_columns is None:
@@ -200,7 +203,7 @@ class SalesforceTools:
             
         # Build the SOQL query
         soql_query = f"""
-        SELECT Id, Name, StageName, Amount, CloseDate, CreatedDate, 
+        SELECT Id, Name, StageName, {amount_field}, CloseDate, CreatedDate, 
                IsWon, IsClosed, OwnerId, Type, Probability, AccountId
         FROM Opportunity
         WHERE CloseDate >= {start_date} AND CloseDate <= {end_date}
@@ -211,7 +214,7 @@ class SalesforceTools:
         
         if self.opportunities is None:
             # Return empty DataFrame with expected columns if no results
-            columns = ['Id', 'Name', 'StageName', 'Amount', 'CloseDate', 'CreatedDate',
+            columns = ['Id', 'Name', 'StageName', f'{amount_field}', 'CloseDate', 'CreatedDate',
                       'IsWon', 'IsClosed', 'OwnerId', 'Type', 'Probability', 'AccountId']
             self.opportunities = pd.DataFrame(columns=columns)
             
@@ -388,11 +391,11 @@ class SalesforceTools:
         won_opps = segments["won"]
         
         metrics = {
-            "Total Revenue from Won Deals": won_opps['Amount'].sum() if 'Amount' in won_opps.columns else 0,
-            "Average Revenue Per Deal": won_opps['Amount'].mean() if 'Amount' in won_opps.columns and len(won_opps) > 0 else 0,
-            "Revenue Growth YoY (%)": self._calculate_revenue_growth(df) if 'Amount' in df.columns else 0,
-            "Revenue from Expansion": segments["won_expansion"]['Amount'].sum() if 'Amount' in segments["won_expansion"].columns else 0,
-            "Revenue from New Business": segments["won_new_business"]['Amount'].sum() if 'Amount' in segments["won_new_business"].columns else 0,
+            "Total Revenue from Won Deals": won_opps[DEFAULT_AMOUNT_FIELD].sum() if DEFAULT_AMOUNT_FIELD in won_opps.columns else 0,
+            "Average Revenue Per Deal": won_opps[DEFAULT_AMOUNT_FIELD].mean() if DEFAULT_AMOUNT_FIELD in won_opps.columns and len(won_opps) > 0 else 0,
+            "Revenue Growth YoY (%)": self._calculate_revenue_growth(df) if DEFAULT_AMOUNT_FIELD in df.columns else 0,
+            "Revenue from Expansion": segments["won_expansion"][DEFAULT_AMOUNT_FIELD].sum() if DEFAULT_AMOUNT_FIELD in segments["won_expansion"].columns else 0,
+            "Revenue from New Business": segments["won_new_business"][DEFAULT_AMOUNT_FIELD].sum() if DEFAULT_AMOUNT_FIELD in segments["won_new_business"].columns else 0,
         }
         
         return metrics
@@ -403,12 +406,12 @@ class SalesforceTools:
         won_opps = segments["won"]
         
         metrics = {
-            "Pipeline Value": df['Amount'].sum() if 'Amount' in df.columns else 0,
-            "Pipeline Growth Rate (%)": self._calculate_pipeline_growth(df) if 'Amount' in df.columns else 0,
-            "Weighted Pipeline Value": (df['Amount'] * df['Probability'] / 100).sum() 
-                                     if ('Amount' in df.columns and 'Probability' in df.columns) else 0,
+            "Pipeline Value": df[DEFAULT_AMOUNT_FIELD].sum() if DEFAULT_AMOUNT_FIELD in df.columns else 0,
+            "Pipeline Growth Rate (%)": self._calculate_pipeline_growth(df) if DEFAULT_AMOUNT_FIELD in df.columns else 0,
+            "Weighted Pipeline Value": (df[DEFAULT_AMOUNT_FIELD] * df['Probability'] / 100).sum() 
+                                     if (DEFAULT_AMOUNT_FIELD in df.columns and 'Probability' in df.columns) else 0,
             "Pipeline Coverage Ratio": self._pipeline_coverage_ratio(df, won_opps) 
-                                     if ('Amount' in df.columns and 'Amount' in won_opps.columns) else 0,
+                                     if (DEFAULT_AMOUNT_FIELD in df.columns and DEFAULT_AMOUNT_FIELD in won_opps.columns) else 0,
         }
         
         return metrics
@@ -428,8 +431,8 @@ class SalesforceTools:
             })
             
         # Only calculate if Amount is present
-        if 'Amount' in won_opps.columns and 'OwnerId' in won_opps.columns:
-            revenue_per_rep = won_opps.groupby('OwnerId')['Amount'].sum().mean() if len(won_opps) > 0 else 0
+        if DEFAULT_AMOUNT_FIELD in won_opps.columns and 'OwnerId' in won_opps.columns:
+            revenue_per_rep = won_opps.groupby('OwnerId')[DEFAULT_AMOUNT_FIELD].sum().mean() if len(won_opps) > 0 else 0
             metrics.update({
                 "Revenue Per Sales Rep": revenue_per_rep,
             })
@@ -450,15 +453,15 @@ class SalesforceTools:
         won_opps = segments["won"]
         
         metrics = {
-            "Expected Revenue from Open Opportunities": open_opps['Amount'].sum() * DEFAULT_WIN_PROBABILITY 
-                                                     if 'Amount' in open_opps.columns else 0,
+            "Expected Revenue from Open Opportunities": open_opps[DEFAULT_AMOUNT_FIELD].sum() * DEFAULT_WIN_PROBABILITY 
+                                                     if DEFAULT_AMOUNT_FIELD in open_opps.columns else 0,
         }
         
         # Add quarterly forecast if CloseDate is available
-        if 'CloseDate' in won_opps.columns and 'Amount' in won_opps.columns:
+        if 'CloseDate' in won_opps.columns and DEFAULT_AMOUNT_FIELD in won_opps.columns:
             quarter_years = won_opps.groupby([won_opps['CloseDate'].dt.year, won_opps['CloseDate'].dt.quarter])
             metrics.update({
-                "Quarterly Revenue Forecast": quarter_years['Amount'].sum().to_dict(),
+                "Quarterly Revenue Forecast": quarter_years[DEFAULT_AMOUNT_FIELD].sum().to_dict(),
             })
         
         return metrics
@@ -472,26 +475,26 @@ class SalesforceTools:
         metrics = {}
         
         # Only calculate if Amount is present
-        if 'Amount' in lost_opps.columns:
+        if DEFAULT_AMOUNT_FIELD in lost_opps.columns:
             metrics.update({
-                "Churned Revenue": lost_opps['Amount'].sum(),
+                "Churned Revenue": lost_opps[DEFAULT_AMOUNT_FIELD].sum(),
             })
             
-        if 'Amount' in won_opps.columns:
-            annual_revenue = won_opps['Amount'].sum()
+        if DEFAULT_AMOUNT_FIELD in won_opps.columns:
+            annual_revenue = won_opps[DEFAULT_AMOUNT_FIELD].sum()
             metrics.update({
                 "ARR (Annual Recurring Revenue)": annual_revenue,
                 "MRR (Monthly Recurring Revenue)": annual_revenue / 12,
             })
             
         # Add metrics that depend on Type field
-        if 'Amount' in won_opps.columns and 'Type' in won_opps.columns:
-            churn_amount = segments["won_churn"]['Amount'].sum() if 'Amount' in segments["won_churn"].columns else 0
-            total_amount = won_opps['Amount'].sum()
+        if DEFAULT_AMOUNT_FIELD in won_opps.columns and 'Type' in won_opps.columns:
+            churn_amount = segments["won_churn"][DEFAULT_AMOUNT_FIELD].sum() if DEFAULT_AMOUNT_FIELD in segments["won_churn"].columns else 0
+            total_amount = won_opps[DEFAULT_AMOUNT_FIELD].sum()
             
             if total_amount > 0:
                 net_retention = ((total_amount - churn_amount) / total_amount) * 100
-                gross_retention = (segments["won"][segments["won"]['Type'] != 'Churn']['Amount'].sum() / total_amount) * 100
+                gross_retention = (segments["won"][segments["won"]['Type'] != 'Churn'][DEFAULT_AMOUNT_FIELD].sum() / total_amount) * 100
             else:
                 net_retention = 0
                 gross_retention = 0
@@ -499,9 +502,9 @@ class SalesforceTools:
             metrics.update({
                 "Net Revenue Retention (%)": net_retention,
                 "Gross Revenue Retention (%)": gross_retention,
-                "Expansion Revenue": segments["won_expansion"]['Amount'].sum() if 'Amount' in segments["won_expansion"].columns else 0,
-                "Upsell Revenue": segments["won_upsell"]['Amount'].sum() if 'Amount' in segments["won_upsell"].columns else 0,
-                "Cross-Sell Revenue": segments["won_cross_sell"]['Amount'].sum() if 'Amount' in segments["won_cross_sell"].columns else 0,
+                "Expansion Revenue": segments["won_expansion"][DEFAULT_AMOUNT_FIELD].sum() if DEFAULT_AMOUNT_FIELD in segments["won_expansion"].columns else 0,
+                "Upsell Revenue": segments["won_upsell"][DEFAULT_AMOUNT_FIELD].sum() if DEFAULT_AMOUNT_FIELD in segments["won_upsell"].columns else 0,
+                "Cross-Sell Revenue": segments["won_cross_sell"][DEFAULT_AMOUNT_FIELD].sum() if DEFAULT_AMOUNT_FIELD in segments["won_cross_sell"].columns else 0,
             })
             
         # Calculate complex metrics
@@ -542,10 +545,10 @@ class SalesforceTools:
         Returns:
             Growth percentage or 0 if insufficient data
         """
-        if 'Year' not in df.columns or 'Amount' not in df.columns or 'IsWon' not in df.columns:
+        if 'Year' not in df.columns or DEFAULT_AMOUNT_FIELD not in df.columns or 'IsWon' not in df.columns:
             return 0
             
-        revenue_by_year = df[df['IsWon'] == True].groupby('Year')['Amount'].sum()
+        revenue_by_year = df[df['IsWon'] == True].groupby('Year')[DEFAULT_AMOUNT_FIELD].sum()
         
         if len(revenue_by_year) < 2:
             return 0
@@ -562,10 +565,10 @@ class SalesforceTools:
         Returns:
             Growth percentage or 0 if insufficient data
         """
-        if 'Year' not in closed_opps.columns or 'Amount' not in closed_opps.columns:
+        if 'Year' not in closed_opps.columns or DEFAULT_AMOUNT_FIELD not in closed_opps.columns:
             return 0
             
-        bookings_by_year = closed_opps.groupby('Year')['Amount'].sum()
+        bookings_by_year = closed_opps.groupby('Year')[DEFAULT_AMOUNT_FIELD].sum()
         
         if len(bookings_by_year) < 2:
             return 0
@@ -602,10 +605,10 @@ class SalesforceTools:
         Returns:
             Growth percentage or 0 if insufficient data
         """
-        if 'Year' not in df.columns or 'Amount' not in df.columns:
+        if 'Year' not in df.columns or DEFAULT_AMOUNT_FIELD not in df.columns:
             return 0
             
-        pipeline_by_year = df.groupby('Year')['Amount'].sum()
+        pipeline_by_year = df.groupby('Year')[DEFAULT_AMOUNT_FIELD].sum()
         
         if len(pipeline_by_year) < 2:
             return 0
@@ -623,11 +626,11 @@ class SalesforceTools:
         Returns:
             Coverage ratio or 0 if insufficient data
         """
-        if 'Amount' not in df.columns or 'Amount' not in won_opps.columns:
+        if DEFAULT_AMOUNT_FIELD not in df.columns or DEFAULT_AMOUNT_FIELD not in won_opps.columns:
             return 0
             
-        pipeline_value = df['Amount'].sum()
-        closed_revenue = won_opps['Amount'].sum()
+        pipeline_value = df[DEFAULT_AMOUNT_FIELD].sum()
+        closed_revenue = won_opps[DEFAULT_AMOUNT_FIELD].sum()
         
         return pipeline_value / closed_revenue if closed_revenue > 0 else 0
     
@@ -641,10 +644,10 @@ class SalesforceTools:
         Returns:
             Estimated CLV or 0 if insufficient data
         """
-        if 'Amount' not in won_opps.columns or 'OwnerId' not in won_opps.columns or len(won_opps) == 0:
+        if DEFAULT_AMOUNT_FIELD not in won_opps.columns or 'OwnerId' not in won_opps.columns or len(won_opps) == 0:
             return 0
             
-        avg_revenue_per_customer = won_opps['Amount'].mean()
+        avg_revenue_per_customer = won_opps[DEFAULT_AMOUNT_FIELD].mean()
         
         # Use a simplified approximation of churn rate
         unique_owners = len(won_opps['OwnerId'].unique())
@@ -685,10 +688,10 @@ class SalesforceTools:
         """
         cac = self._customer_acquisition_cost(won_opps)
         
-        if 'Amount' not in won_opps.columns or len(won_opps) == 0:
+        if DEFAULT_AMOUNT_FIELD not in won_opps.columns or len(won_opps) == 0:
             return 0
             
-        mrr = won_opps['Amount'].sum() / 12
+        mrr = won_opps[DEFAULT_AMOUNT_FIELD].sum() / 12
         
         return cac / mrr if mrr > 0 else 0
     
@@ -718,7 +721,7 @@ class SalesforceTools:
         df = self.opportunities.copy()
         
         # Group by stage and sum amounts
-        pipeline_by_stage = df.groupby('StageName')['Amount'].sum().sort_values(ascending=False)
+        pipeline_by_stage = df.groupby('StageName')[DEFAULT_AMOUNT_FIELD].sum().sort_values(ascending=False)
         
         # Create the plot
         fig, ax = plt.subplots(figsize=figsize)
