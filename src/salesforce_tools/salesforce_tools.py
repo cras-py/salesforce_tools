@@ -795,7 +795,7 @@ class SalesforceTools:
         # Add KPI calculations if requested
         if include_kpis and hasattr(self, 'calculate_kpis'):
             # Flatten the dictionary
-                kpi_df = self.flatten_dict(sf.calculate_kpis())
+                kpi_df = self.flatten_dict(self.calculate_kpis())
 
                 # Convert the flattened dictionary to a DataFrame (one row per record)
                 kpi_df = pd.DataFrame([kpi_df])
